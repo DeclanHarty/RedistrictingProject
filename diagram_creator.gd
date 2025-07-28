@@ -132,7 +132,9 @@ func check_if_edge_pixel(pos):
 			return true
 	return false
 					
+
 func init_district_map(image_width, image_height):
+	""" Initializes the district map as a 2d array with each cell set to -1"""
 	for x in range(image_width):
 		var y_col = []
 		for y in range(image_height):
@@ -140,6 +142,7 @@ func init_district_map(image_width, image_height):
 		district_map.append(y_col)
 		
 func get_neighboring_districts(pos : Vector2, district_map):
+	""" Returns an array of the unique districts niehgboring a position"""
 	var current_district = district_map[pos.x][pos.y]
 	var neighboring_districts = []
 	for direction in directions:
@@ -153,6 +156,8 @@ func get_neighboring_districts(pos : Vector2, district_map):
 	return neighboring_districts
 	
 func determine_new_edges(pos, original_district, new_district, district_map, edges):
+	""" Determines if given tile and its neighbors are now edge tiles and updates the 
+	edges array to match"""
 	#for direction in directions:
 		#var check_pos = pos + direction
 		#if (check_pos.x < 0 or check_pos.x >= CANVAS_WIDTH or check_pos.y < 0 or check_pos.y >= CANVAS_HEIGHT):
@@ -169,24 +174,32 @@ func determine_new_edges(pos, original_district, new_district, district_map, edg
 				
 	for direction in directions:
 		var check_pos = pos + direction
+		#Check if cell is in the bounds of the map
 		if (check_pos.x < 0 or check_pos.x >= CANVAS_WIDTH or check_pos.y < 0 or check_pos.y >= CANVAS_HEIGHT):
 			continue
+		
+		#Add or remove tile from edge list
 		var is_now_edge = check_if_edge_pixel(check_pos)
 		if(is_now_edge and check_pos not in edges):
 			edges.append(check_pos)
 		elif(!is_now_edge and check_pos in edges):
 			edges.erase(check_pos)
 			
+	#Check if the flipped pixel is still an edge
 	var pixel_is_still_edge = check_if_edge_pixel(pos)
 	if !pixel_is_still_edge:
 		edges.erase(pos)
 					
 func flip_edge():
+	# Get a random edge tile to potentially flip
 	var edge_index = randi_range(0, len(edges) - 1)
 	var pos = edges[edge_index]
+	# Get tile's original district
 	var original_district = district_map[pos.x][pos.y]
 	
+	# Get the neighboring district values of the chosen edge (not including original district value)
 	var neighboring_districts = get_neighboring_districts(pos, district_map)
+	
 	#if(len(neighboring_districts) == 0):
 		#print("Fail")
 		#print(pos)
@@ -202,23 +215,33 @@ func flip_edge():
 			#test_neighbors.append(district_map[check_pos.x][check_pos.y])
 		#print(test_neighbors)
 			
+	# Choose a random district that neighbors the chosen edge tile
 	var neighbor_index = randi_range(0, len(neighboring_districts) - 1)
-	
 	var new_district = neighboring_districts[neighbor_index]
 	
+	# Make a deep copy of the current district map and update it to match the potential move
 	var new_dict = district_area_map.duplicate(true)
-	
 	new_dict[original_district] -= 1
 	new_dict[new_district] += 1
-	var test_std_deviation = calc_stand_dev(district_area_map.values())
+	
+	# Calculate the std_deviation of the new move and roll a value between 0 and 1
+	var test_std_deviation = calc_stand_dev(new_dict.values())
 	var bad_move_value = randf()
+	
+	# If move decreases area std deviation or passes the bad move check
 	if(test_std_deviation <= current_std_deviation or bad_move_value < initial_bad_move_chance):
+		# Increase the number of bad iterations if a "bad" move
 		if(test_std_deviation > current_std_deviation and bad_move_value < initial_bad_move_chance):
 			initial_bad_move_chance -= TEMP_CHANGE_RATE
 			number_of_bad_iterations += 1
+		
+		#Update the district area map and district map to the new district
 		district_area_map = new_dict
 		district_map[pos.x][pos.y] = new_district
+		
+		#Update standard deviation to match new standard deviation
 		current_std_deviation = test_std_deviation
+		#Update edges to match new map
 		determine_new_edges(pos, original_district, new_district, district_map, edges)
 		#find_edge_pixels(directions)
 		return [pos, new_district]
