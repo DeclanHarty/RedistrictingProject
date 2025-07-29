@@ -3,7 +3,7 @@ extends Sprite2D
 const COLORS = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080']
 const CANVAS_WIDTH = 32
 const CANVAS_HEIGHT = 32
-const MOORES_NEIGHBORS = [Vector2(0,1), Vector2(0,-1),  Vector2(1,0), Vector2(-1,0), Vector2(1,1), Vector2(1,-1), Vector2(-1,1), Vector2(-1,-1)]
+const MOORES_NEIGHBORS = [Vector2(0,1), Vector2(1,1),  Vector2(1,0), Vector2(1,-1), Vector2(0,-1), Vector2(-1,-1), Vector2(-1,0), Vector2(-1,1)]
 const CARDINAL_DIRECTIONS = [Vector2(0,1), Vector2(0,-1), Vector2(1,0), Vector2(-1,0)]
 
 var district_map  = []
@@ -20,8 +20,9 @@ var best_district_area_map
 var dynimage
 var image_texture
 var time_since_last_step = 1.0
+var time_between_steps = 3
 
-var initial_bad_move_chance = .2
+var initial_bad_move_chance = .20
 var TEMP_CHANGE_RATE = 0
 const MAX_NUMBER_OF_BAD_ITERATIONS = 50
 var number_of_bad_iterations = 0
@@ -64,7 +65,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	time_since_last_step -= delta
 	if(time_since_last_step <= 0 and len(edges) > 0):
-		time_since_last_step = 0.01
+		time_since_last_step = time_between_steps
 		var pos_and_new_district = flip_edge()
 		
 		if(pos_and_new_district[1] == -1):
@@ -156,7 +157,7 @@ func get_neighboring_districts(pos : Vector2, district_map):
 	return neighboring_districts
 	
 func determine_new_edges(pos, original_district, new_district, district_map, edges):
-	""" Determines if given tile and its neighbors are now edge tiles and updates the 
+	""" Determines if given tile and its neighbors are now edge tiles and updates the
 	edges array to match"""
 	#for direction in directions:
 		#var check_pos = pos + direction
@@ -224,6 +225,9 @@ func flip_edge():
 	new_dict[original_district] -= 1
 	new_dict[new_district] += 1
 	
+	if(move_creates_split_check(pos, district_map)):
+		return [Vector2.ZERO, -1]
+	
 	# Calculate the std_deviation of the new move and roll a value between 0 and 1
 	var test_std_deviation = calc_stand_dev(new_dict.values())
 	var bad_move_value = randf()
@@ -265,6 +269,75 @@ func calc_stand_dev(values):
 	
 	average_4th_distance = distance_sum / len(values)
 	return sqrt(average_4th_distance)
+	
+func move_creates_split_check(pos, current_district_map):
+	var start_district
+	var current_district
+	
+	# Flags
+	#var intial_group_ended = false
+	var should_match_beginning = false
+	
+	var districts_that_should_not_appear_again = []
+	print(pos)
+	var neighbors = []
+	for direction in MOORES_NEIGHBORS:
+		var check_pos = pos + direction
+		#Check if cell is in the bounds of the map
+		if (check_pos.x < 0 or check_pos.x >= CANVAS_WIDTH or check_pos.y < 0 or check_pos.y >= CANVAS_HEIGHT):
+			neighbors.append(-1)
+			
+		else:
+			var checked_cell_district = current_district_map[check_pos.x][check_pos.y]
+			neighbors.append(checked_cell_district)
+	
+	print(neighbors)
+			
+	for direction in MOORES_NEIGHBORS:
+		var check_pos = pos + direction
+		
+		#Check if cell is in the bounds of the map
+		if (check_pos.x < 0 or check_pos.x >= CANVAS_WIDTH or check_pos.y < 0 or check_pos.y >= CANVAS_HEIGHT):
+			# If start_district has not been set yet initialize it to -1
+			if(start_district == null):
+				start_district = -1
+				current_district = -1
+			# If current_district is different from the checked cell's district
+			elif(current_district != -1):
+				districts_that_should_not_appear_again.append(current_district)
+				current_district = -1
+			print(-1)
+		else:
+			var checked_cell_district = current_district_map[check_pos.x][check_pos.y]
+			if(start_district == null):
+				print("Set Start")
+				# Set start and current district to the district of the checked cell
+				start_district = checked_cell_district
+				current_district = checked_cell_district
+			
+			# If a district that should not have appeared again comes up return true
+			elif(checked_cell_district in districts_that_should_not_appear_again):
+				print("District Came Up Again")
+				return true
+			# If encountering a new district
+			elif(current_district != checked_cell_district):
+				if(current_district != start_district):
+					districts_that_should_not_appear_again.append(current_district)
+				else:
+					should_match_beginning = true
+					continue
+					
+				if(should_match_beginning):
+					print("Did Not Properly Loop")
+					return true
+					
+				current_district = checked_cell_district
+			print(checked_cell_district)
+	print("Went through")
+	return false
+					
+				
+			
 	
 	
 	
