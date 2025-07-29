@@ -20,7 +20,7 @@ var best_district_area_map
 var dynimage
 var image_texture
 var time_since_last_step = 1.0
-var time_between_steps = 3
+var time_between_steps = .01
 
 var initial_bad_move_chance = .20
 var TEMP_CHANGE_RATE = 0
@@ -275,7 +275,7 @@ func move_creates_split_check(pos, current_district_map):
 	var current_district
 	
 	# Flags
-	#var intial_group_ended = false
+	var loop_flag = false
 	var should_match_beginning = false
 	
 	var districts_that_should_not_appear_again = []
@@ -310,7 +310,6 @@ func move_creates_split_check(pos, current_district_map):
 		else:
 			var checked_cell_district = current_district_map[check_pos.x][check_pos.y]
 			if(start_district == null):
-				print("Set Start")
 				# Set start and current district to the district of the checked cell
 				start_district = checked_cell_district
 				current_district = checked_cell_district
@@ -321,18 +320,20 @@ func move_creates_split_check(pos, current_district_map):
 				return true
 			# If encountering a new district
 			elif(current_district != checked_cell_district):
-				if(current_district != start_district):
-					districts_that_should_not_appear_again.append(current_district)
-				else:
-					should_match_beginning = true
-					continue
-					
 				if(should_match_beginning):
 					print("Did Not Properly Loop")
 					return true
+				
+				if(current_district != start_district):
+					districts_that_should_not_appear_again.append(current_district)
+				else:
+					if(loop_flag):
+						should_match_beginning = true
+					else:
+						loop_flag = true
 					
 				current_district = checked_cell_district
-			print(checked_cell_district)
+		print(current_district)
 	print("Went through")
 	return false
 					
