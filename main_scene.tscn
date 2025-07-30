@@ -3,8 +3,12 @@
 [ext_resource type="Script" uid="uid://bp85gl7yqabac" path="res://diagram_creator.gd" id="1_0f027"]
 
 [node name="Node2D" type="Node2D"]
-
-[node name="Sprite2D" type="Sprite2D" parent="."]
-position = Vector2(580, 300)
-scale = Vector2(16, 16)
 script = ExtResource("1_0f027")
+
+[node name="CurrentMap" type="Sprite2D" parent="."]
+position = Vector2(880.355, 300)
+scale = Vector2(16, 16)
+
+[node name="BestMap" type="Sprite2D" parent="."]
+position = Vector2(280, 300)
+scale = Vector2(16, 16)

@@ -1,4 +1,4 @@
-extends Sprite2D
+extends Node2D
 
 const COLORS = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080']
 const CANVAS_WIDTH = 32
@@ -17,32 +17,45 @@ var best_district_map
 var best_std_deviation
 var best_district_area_map
 
-var dynimage
-var image_texture
+var working_image
+var best_image
+var working_texture
+var best_texture
+
 var time_since_last_step = 1.0
-var time_between_steps = .01
+var time_between_steps = 0
 
 var initial_bad_move_chance = .20
 var TEMP_CHANGE_RATE = 0
 const MAX_NUMBER_OF_BAD_ITERATIONS = 50
 var number_of_bad_iterations = 0
 
+var BEST_RESULT_SPRITE
+var CURRENT_SPRITE
+
 func _ready() -> void:
+	working_image = Image.new()
+	working_texture = ImageTexture.new()
+	best_image = Image.new()
+	best_texture = ImageTexture.new()
 	
-	dynimage = Image.new()
-	image_texture = ImageTexture.new()
+	BEST_RESULT_SPRITE = $BestMap
+	CURRENT_SPRITE = $CurrentMap
 	
 	init_district_map(CANVAS_WIDTH, CANVAS_HEIGHT)
 	
-	dynimage = Image.create_empty(CANVAS_WIDTH, CANVAS_HEIGHT, false, Image.FORMAT_RGBA8)
-	dynimage.fill(Color.WHITE)
+	working_image = Image.create_empty(CANVAS_WIDTH, CANVAS_HEIGHT, false, Image.FORMAT_RGBA8)
+	working_image.fill(Color.WHITE)
+	best_image = Image.create_empty(CANVAS_WIDTH, CANVAS_HEIGHT, false, Image.FORMAT_RGBA8)
+	best_image.fill(Color.WHITE)
 	
 	var positions = create_random_positions(12, CANVAS_WIDTH, CANVAS_HEIGHT)
 	
 	for x in range(CANVAS_WIDTH):
 		for y in range(CANVAS_HEIGHT):
 			var closest_position_index = determine_nearest_position(Vector2(x,y), positions)
-			dynimage.set_pixel(x,y, Color(COLORS[closest_position_index]))
+			working_image.set_pixel(x,y, Color(COLORS[closest_position_index]))
+			best_image.set_pixel(x,y, Color(COLORS[closest_position_index]))
 			district_map[x][y] = closest_position_index
 			if(closest_position_index in district_area_map):
 				district_area_map[closest_position_index] += 1
@@ -58,9 +71,13 @@ func _ready() -> void:
 			
 	find_edge_pixels(directions)
 	
-	image_texture = ImageTexture.create_from_image(dynimage)
-	self.texture = image_texture
-	self.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	working_texture = ImageTexture.create_from_image(working_image)
+	CURRENT_SPRITE.texture = working_texture
+	CURRENT_SPRITE.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	
+	best_texture = ImageTexture.create_from_image(best_image)
+	BEST_RESULT_SPRITE.texture = best_texture
+	BEST_RESULT_SPRITE.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	
 func _process(delta: float) -> void:
 	time_since_last_step -= delta
@@ -74,6 +91,11 @@ func _process(delta: float) -> void:
 			best_std_deviation = current_std_deviation
 			best_district_map = district_map
 			best_district_area_map = district_area_map
+			
+			for x in range(CANVAS_WIDTH):
+				for y in range(CANVAS_HEIGHT):
+					best_image.set_pixel(x,y, Color(COLORS[district_map[x][y]]))
+					
 		if(number_of_bad_iterations >= MAX_NUMBER_OF_BAD_ITERATIONS):
 			number_of_bad_iterations = 0
 			district_map = best_district_map
@@ -83,13 +105,16 @@ func _process(delta: float) -> void:
 			print("Moved Back")
 			for x in CANVAS_WIDTH:
 				for y in CANVAS_HEIGHT:
-					dynimage.set_pixel(x, y, Color(COLORS[district_map[x][y]]))
+					working_image.set_pixel(x, y, Color(COLORS[best_district_map[x][y]]))
 		else:
-			dynimage.set_pixel(pos_and_new_district[0].x, pos_and_new_district[0].y, Color(COLORS[pos_and_new_district[1]]))
+			working_image.set_pixel(pos_and_new_district[0].x, pos_and_new_district[0].y, Color(COLORS[pos_and_new_district[1]]))
 
 		print(str(current_std_deviation) + " : " + str(initial_bad_move_chance))
-		image_texture = ImageTexture.create_from_image(dynimage)
-		self.texture = image_texture
+		working_texture = ImageTexture.create_from_image(working_image)
+		CURRENT_SPRITE.texture = working_texture
+		
+		best_texture = ImageTexture.create_from_image(best_image)
+		BEST_RESULT_SPRITE.texture = best_texture
 	pass
 	
 func create_random_positions(number_of_positions, image_width, image_height):
@@ -279,7 +304,7 @@ func move_creates_split_check(pos, current_district_map):
 	var should_match_beginning = false
 	
 	var districts_that_should_not_appear_again = []
-	print(pos)
+	
 	var neighbors = []
 	for direction in MOORES_NEIGHBORS:
 		var check_pos = pos + direction
@@ -291,7 +316,7 @@ func move_creates_split_check(pos, current_district_map):
 			var checked_cell_district = current_district_map[check_pos.x][check_pos.y]
 			neighbors.append(checked_cell_district)
 	
-	print(neighbors)
+	#print(str(pos) + " : " + str(neighbors))
 			
 	for direction in MOORES_NEIGHBORS:
 		var check_pos = pos + direction
@@ -299,6 +324,9 @@ func move_creates_split_check(pos, current_district_map):
 		#Check if cell is in the bounds of the map
 		if (check_pos.x < 0 or check_pos.x >= CANVAS_WIDTH or check_pos.y < 0 or check_pos.y >= CANVAS_HEIGHT):
 			# If start_district has not been set yet initialize it to -1
+			if(should_match_beginning):
+				#print("District Came Up Again")
+				return true
 			if(start_district == null):
 				start_district = -1
 				current_district = -1
@@ -306,7 +334,7 @@ func move_creates_split_check(pos, current_district_map):
 			elif(current_district != -1):
 				districts_that_should_not_appear_again.append(current_district)
 				current_district = -1
-			print(-1)
+			#print(-1)
 		else:
 			var checked_cell_district = current_district_map[check_pos.x][check_pos.y]
 			if(start_district == null):
@@ -316,25 +344,27 @@ func move_creates_split_check(pos, current_district_map):
 			
 			# If a district that should not have appeared again comes up return true
 			elif(checked_cell_district in districts_that_should_not_appear_again):
-				print("District Came Up Again")
+				#print("District Came Up Again")
 				return true
 			# If encountering a new district
 			elif(current_district != checked_cell_district):
 				if(should_match_beginning):
-					print("Did Not Properly Loop")
+					#print("Did Not Properly Loop")
 					return true
 				
 				if(current_district != start_district):
 					districts_that_should_not_appear_again.append(current_district)
-				else:
-					if(loop_flag):
+					if(loop_flag and checked_cell_district == start_district):
 						should_match_beginning = true
-					else:
-						loop_flag = true
+						#print("Should match")
+				else:
+					
+					loop_flag = true
+					#print("set loop flag")
 					
 				current_district = checked_cell_district
-		print(current_district)
-	print("Went through")
+		#print(current_district)
+	#print("Went through")
 	return false
 					
 				
