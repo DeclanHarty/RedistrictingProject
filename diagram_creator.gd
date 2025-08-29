@@ -5,15 +5,15 @@ const CANVAS_WIDTH = 32
 const CANVAS_HEIGHT = 32
 const MOORES_NEIGHBORS = [Vector2i(0,1), Vector2i(1,1),  Vector2i(1,0), Vector2i(1,-1), Vector2i(0,-1), Vector2i(-1,-1), Vector2i(-1,0), Vector2i(-1,1)]
 const CARDINAL_DIRECTIONS = [Vector2i(0,1), Vector2i(0,-1), Vector2i(1,0), Vector2i(-1,0)]
-const NUMBER_OF_DISTRICTS = 12
+@export var NUMBER_OF_DISTRICTS = 12
 
-const SIZE_STD_DEV_WEIGHT = 100
-const DISTANCE_FROM_CENTER_DEV_WEIGHT = 50
+@export var SIZE_STD_DEV_WEIGHT = 100
+@export var DISTANCE_FROM_CENTER_DEV_WEIGHT = 50
 # Array of Vector2i's representing the tiles that are currently edges
 var edges : Array[Vector2i] = []
 var directions = CARDINAL_DIRECTIONS
 
-
+@export var running : bool
 
 #Working District State
 var working_state : RedistrictingState = RedistrictingState.new()
@@ -76,7 +76,7 @@ func _ready() -> void:
 	# Add up the total number of tiles per district
 	for x in range(CANVAS_WIDTH):
 		for y in range(CANVAS_HEIGHT):
-			var closest_position_index = determine_nearest_position(Vector2i(x,y), positions)
+			var closest_position_index = determine_nearest_position(Vector2(x,y), positions)
 			working_image.set_pixel(x,y, Color(COLORS[closest_position_index]))
 			best_image.set_pixel(x,y, Color(COLORS[closest_position_index]))
 			district_map[x][y] = closest_position_index
@@ -88,10 +88,26 @@ func _ready() -> void:
 		var center : Vector2 = Vector2(district_position_sums[i]) / float(district_sizes[i])
 		district_centers.append(center)
 	
-	#var distance_from_center_sums = []
-	#for x in CANVAS_WIDTH:
-		#for y in CANVAS_HEIGHT:
+	# An array where the index represents the district and the value represents the total distance from center
+	# for every tile in that district
+	var distance_from_center_sums = []
+	distance_from_center_sums.resize(NUMBER_OF_DISTRICTS)
+	distance_from_center_sums.fill(0)
+	
+	for x in CANVAS_WIDTH:
+		for y in CANVAS_HEIGHT:
+			var district = district_map[x][y]
+			var distance_from_center = Vector2(x,y).distance_to(district_centers[district])
+			distance_from_center_sums[district] += distance_from_center
 			
+	
+	var average_distances_from_district_center = []
+	for i in range(len(distance_from_center_sums)):
+		average_distances_from_district_center.append(distance_from_center_sums[i] / float(district_sizes[i]))
+		
+	avg_distance_from_center_std_dev = calc_stand_dev(average_distances_from_district_center)
+	
+	print(avg_distance_from_center_std_dev)
 				
 	# Calculate the current standard deviation 
 	current_size_std_dev = calc_stand_dev(district_sizes)
@@ -114,6 +130,8 @@ func _ready() -> void:
 	BEST_RESULT_SPRITE.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	
 func _process(delta: float) -> void:
+	if (!running):
+		return
 	time_since_last_step -= delta
 	if(time_since_last_step <= 0 and len(edges) > 0):
 		time_since_last_step = time_between_steps
