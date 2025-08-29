@@ -6,29 +6,17 @@ const CANVAS_HEIGHT = 32
 const MOORES_NEIGHBORS = [Vector2i(0,1), Vector2i(1,1),  Vector2i(1,0), Vector2i(1,-1), Vector2i(0,-1), Vector2i(-1,-1), Vector2i(-1,0), Vector2i(-1,1)]
 const CARDINAL_DIRECTIONS = [Vector2i(0,1), Vector2i(0,-1), Vector2i(1,0), Vector2i(-1,0)]
 const NUMBER_OF_DISTRICTS = 12
+
+const SIZE_STD_DEV_WEIGHT = 100
+const DISTANCE_FROM_CENTER_DEV_WEIGHT = 50
 # Array of Vector2i's representing the tiles that are currently edges
 var edges : Array[Vector2i] = []
 var directions = CARDINAL_DIRECTIONS
 
-# 2D Array of integers that represents the map where each integer 
-# indicates what district that tile belongs to
-var district_map  = []
 
-# Array of integers where each index indicates the district and the integer indicates the number of tiles a part of that district.
-var district_sizes = []
-# Current std dev among district size
-var current_size_std_dev
-# Array of vector2i's that represents the sum of the positions of each district
-var district_position_sums : Array[Vector2i]
 
 #Working District State
 var working_state : RedistrictingState = RedistrictingState.new()
-
-# Best result variables
-var best_district_map
-var best_district_sizes
-var best_size_std_dev
-var best_district_position_sums
 
 #Best Districting State
 var best_state : RedistrictingState = RedistrictingState.new()
@@ -59,11 +47,21 @@ func _ready() -> void:
 	# Get sprite references
 	BEST_RESULT_SPRITE = $BestMap
 	CURRENT_SPRITE = $CurrentMap
-	
+	# 2D Array of integers that represents the map where each integer 
+	# indicates what district that tile belongs to
+	var district_map  = []
+	# Array of integers where each index indicates the district and the integer indicates the number of tiles a part of that district.
+	var district_sizes = []
+	# Current std dev among district size
+	var current_size_std_dev
+	# Array of vector2i's that represents the sum of the positions of each district
+	var district_position_sums : Array[Vector2i]
+	district_position_sums.resize(NUMBER_OF_DISTRICTS)
+	# std dev of the average distance from district center for all districts
+	var avg_distance_from_center_std_dev
 	# Initialize district map and district map area
-	init_district_map(CANVAS_WIDTH, CANVAS_HEIGHT)
+	init_district_map(district_map, district_sizes, CANVAS_WIDTH, CANVAS_HEIGHT)
 	
-	# Create and initialize both best and 
 	
 	#Set Images to white initially
 	working_image = Image.create_empty(CANVAS_WIDTH, CANVAS_HEIGHT, false, Image.FORMAT_RGBA8)
@@ -83,19 +81,27 @@ func _ready() -> void:
 			best_image.set_pixel(x,y, Color(COLORS[closest_position_index]))
 			district_map[x][y] = closest_position_index
 			district_sizes[closest_position_index] += 1
+			district_position_sums[closest_position_index] += Vector2i(x,y)
+			
+	var district_centers = []
+	for i in range(len(district_position_sums)):
+		var center : Vector2 = Vector2(district_position_sums[i]) / float(district_sizes[i])
+		district_centers.append(center)
+	
+	#var distance_from_center_sums = []
+	#for x in CANVAS_WIDTH:
+		#for y in CANVAS_HEIGHT:
+			
 				
 	# Calculate the current standard deviation 
 	current_size_std_dev = calc_stand_dev(district_sizes)
-	# Set initial best values
-	best_district_map = district_map.duplicate(true)
-	best_size_std_dev = current_size_std_dev
-	best_district_sizes = district_sizes.duplicate(true)
 	
-	
-	print(district_sizes)
-	print(current_size_std_dev)
+	#Set Working State
+	working_state.intialize(district_map, district_sizes, current_size_std_dev, district_position_sums, CANVAS_WIDTH, CANVAS_HEIGHT)
+	# Set Best from Working State
+	best_state.copy_from(working_state)
 			
-	find_edge_pixels(directions)
+	find_starting_edge_pixels(working_state, directions)
 	
 	# Set the working sprite
 	working_texture = ImageTexture.create_from_image(working_image)
@@ -115,30 +121,29 @@ func _process(delta: float) -> void:
 		
 		if(pos_and_new_district[1] == -1):
 			return
-		if(current_size_std_dev < best_size_std_dev):
-			best_size_std_dev = current_size_std_dev
-			best_district_map = district_map.duplicate(true)
-			best_district_sizes = district_sizes.duplicate(true)
+		if(working_state.get_score() < best_state.get_score()):
+			print("Best Score : " + str(best_state.get_score()))
+			print("Working Score : " + str(working_state.get_score()))
+			best_state.copy_from(working_state)
+			
 			
 			for x in range(CANVAS_WIDTH):
 				for y in range(CANVAS_HEIGHT):
-					best_image.set_pixel(x,y, Color(COLORS[district_map[x][y]]))
+					best_image.set_pixel(x,y, Color(COLORS[working_state.get_district_from_tile(x,y)]))
 					
 		if(number_of_bad_iterations >= MAX_NUMBER_OF_BAD_ITERATIONS):
 			number_of_bad_iterations = 0
-			district_map = best_district_map.duplicate(true)
-			district_sizes = best_district_sizes.duplicate(true)
-			current_size_std_dev = best_size_std_dev
+			working_state.copy_from(best_state)
 			
-			edges = find_edge_pixels(directions)
+			edges = find_starting_edge_pixels(working_state, directions)
 			print("\nMoved Back\n")
 			for x in CANVAS_WIDTH:
 				for y in CANVAS_HEIGHT:
-					working_image.set_pixel(x, y, Color(COLORS[best_district_map[x][y]]))
+					working_image.set_pixel(x, y, Color(COLORS[working_state.get_district_from_tile(x,y)]))
 		else:
 			working_image.set_pixel(pos_and_new_district[0].x, pos_and_new_district[0].y, Color(COLORS[pos_and_new_district[1]]))
 
-		print(str(current_size_std_dev) + " : " + str(initial_bad_move_chance))
+		print(str(working_state.get_size_std_dev()) + " : " + str(initial_bad_move_chance))
 		working_texture = ImageTexture.create_from_image(working_image)
 		CURRENT_SPRITE.texture = working_texture
 		
@@ -170,27 +175,17 @@ func determine_nearest_position(test_pos : Vector2i, positions):
 			
 	return current_closest
 
-func find_edge_pixels(directions):
+func find_starting_edge_pixels(redistricting_state : RedistrictingState, directions):
 	edges = []
 	for x in range(CANVAS_WIDTH):
 		for y in range(CANVAS_HEIGHT):
 			var pos = Vector2i(x,y)
-			if check_if_edge_pixel(pos):
+			if redistricting_state.check_if_edge_pixel(pos, directions):
 				edges.append(pos)
 				
 	return edges
-					
-func check_if_edge_pixel(pos):
-	for direction in directions:
-		var check_pos = pos + direction
-		if (check_pos.x < 0 or check_pos.x >= CANVAS_WIDTH or check_pos.y < 0 or check_pos.y >= CANVAS_HEIGHT):
-			continue
-		if(district_map[pos.x][pos.y] != district_map[check_pos.x][check_pos.y]):
-			return true
-	return false
-					
 
-func init_district_map(image_width, image_height):
+func init_district_map(district_map, district_sizes, image_width, image_height):
 	""" Initializes the district map as a 2d array with each cell set to -1 and sets the district area map"""
 	district_sizes.resize(NUMBER_OF_DISTRICTS)
 	for i in range(len(district_sizes)):
@@ -215,81 +210,77 @@ func get_neighboring_districts(pos : Vector2i, district_map):
 			
 	return neighboring_districts
 	
-func determine_new_edges(pos, original_district, new_district, district_map, edges):
-	""" Determines if given tile and its neighbors are now edge tiles and updates the
-	edges array to match"""
+#func determine_new_edges(pos, original_district, new_district, district_map, edges):
+	#""" Determines if given tile and its neighbors are now edge tiles and updates the
+	#edges array to match"""
+	##for direction in directions:
+		##var check_pos = pos + direction
+		##if (check_pos.x < 0 or check_pos.x >= CANVAS_WIDTH or check_pos.y < 0 or check_pos.y >= CANVAS_HEIGHT):
+			##continue
+		##var check_district = district_map[check_pos.x][check_pos.y]
+		##if check_district == original_district && check_pos not in edges:
+			##edges.append(check_pos)
+		##if check_district == new_district:
+			##var is_now_edge = check_if_edge_pixel(check_pos)
+			##if(is_now_edge and check_pos not in edges):
+				##edges.append(check_pos)
+			##elif(!is_now_edge and check_pos in edges):
+				##edges.erase(check_pos)
+				#
 	#for direction in directions:
 		#var check_pos = pos + direction
+		##Check if cell is in the bounds of the map
 		#if (check_pos.x < 0 or check_pos.x >= CANVAS_WIDTH or check_pos.y < 0 or check_pos.y >= CANVAS_HEIGHT):
 			#continue
-		#var check_district = district_map[check_pos.x][check_pos.y]
-		#if check_district == original_district && check_pos not in edges:
+		#
+		##Add or remove tile from edge list
+		#var is_now_edge = check_if_edge_pixel(check_pos)
+		#if(is_now_edge and check_pos not in edges):
 			#edges.append(check_pos)
-		#if check_district == new_district:
-			#var is_now_edge = check_if_edge_pixel(check_pos)
-			#if(is_now_edge and check_pos not in edges):
-				#edges.append(check_pos)
-			#elif(!is_now_edge and check_pos in edges):
-				#edges.erase(check_pos)
-				
-	for direction in directions:
-		var check_pos = pos + direction
-		#Check if cell is in the bounds of the map
-		if (check_pos.x < 0 or check_pos.x >= CANVAS_WIDTH or check_pos.y < 0 or check_pos.y >= CANVAS_HEIGHT):
-			continue
-		
-		#Add or remove tile from edge list
-		var is_now_edge = check_if_edge_pixel(check_pos)
-		if(is_now_edge and check_pos not in edges):
-			edges.append(check_pos)
-		elif(!is_now_edge and check_pos in edges):
-			edges.erase(check_pos)
-			
-	#Check if the flipped pixel is still an edge
-	var pixel_is_still_edge = check_if_edge_pixel(pos)
-	if !pixel_is_still_edge:
-		edges.erase(pos)
+		#elif(!is_now_edge and check_pos in edges):
+			#edges.erase(check_pos)
+			#
+	##Check if the flipped pixel is still an edge
+	#var pixel_is_still_edge = check_if_edge_pixel(pos)
+	#if !pixel_is_still_edge:
+		#edges.erase(pos)
 					
 func flip_edge():
 	# Get a random edge tile to potentially flip
 	var edge_index = randi_range(0, len(edges) - 1)
 	var pos = edges[edge_index]
 	# Get tile's original district
-	var original_district = district_map[pos.x][pos.y]
+	var original_district = working_state.get_district_from_tile(pos.x, pos.y)
 	
 	# Get the neighboring district values of the chosen edge (not including original district value)
-	var neighboring_districts = get_neighboring_districts(pos, district_map)
+	var neighboring_districts = working_state.get_neighboring_districts_from_position(pos, directions)
 			
 	# Choose a random district that neighbors the chosen edge tile
 	var neighbor_index = randi_range(0, len(neighboring_districts) - 1)
 	var new_district = neighboring_districts[neighbor_index]
 	
-	# Make a deep copy of the current district map and update it to match the potential move
-	var new_dict = district_sizes.duplicate(true)
-	new_dict[original_district] -= 1
-	new_dict[new_district] += 1
-	
-	if(move_creates_split_check(pos, district_map)):
+	#Check if move would create a split
+	if(working_state.move_creates_split_check(pos)):
 		return [Vector2i.ZERO, -1]
-	# Calculate the std_deviation of the new move and roll a value between 0 and 1
-	var test_std_deviation = calc_stand_dev(new_dict)
+
 	var bad_move_value = randf()
+	#Test Move
+	var move_is_good = working_state.test_move(pos, new_district, SIZE_STD_DEV_WEIGHT, DISTANCE_FROM_CENTER_DEV_WEIGHT)
+
 	
 	# If move decreases area std deviation or passes the bad move check
-	if(test_std_deviation <= current_size_std_dev or bad_move_value < initial_bad_move_chance):
+	if(move_is_good or bad_move_value < initial_bad_move_chance):
 		# Increase the number of bad iterations if a "bad" move
-		if(test_std_deviation > current_size_std_dev and bad_move_value < initial_bad_move_chance):
+		if(!move_is_good and bad_move_value < initial_bad_move_chance):
 			initial_bad_move_chance -= TEMP_CHANGE_RATE
 			number_of_bad_iterations += 1
 		
-		#Update the district area map and district map to the new district
-		district_sizes = new_dict
-		district_map[pos.x][pos.y] = new_district
+		# Call algorithm state to perform move
+		working_state.make_move(pos, new_district, SIZE_STD_DEV_WEIGHT, DISTANCE_FROM_CENTER_DEV_WEIGHT)
 		
-		#Update standard deviation to match new standard deviation
-		current_size_std_dev = test_std_deviation
+
 		#Update edges to match new map
-		determine_new_edges(pos, original_district, new_district, district_map, edges)
+		working_state.determine_new_edges(pos, original_district, edges, directions)
 		#find_edge_pixels(directions)
 		return [pos, new_district]
 	else:
@@ -298,7 +289,7 @@ func flip_edge():
 	
 func calc_stand_dev(values):
 	var average_value
-	var average_4th_distance
+	var average_squared_distance
 	
 	var distance_sum = 0
 	var sum = 0
@@ -310,8 +301,8 @@ func calc_stand_dev(values):
 	for value in values:
 		distance_sum += pow((value - average_value),2)
 	
-	average_4th_distance = distance_sum / len(values)
-	return sqrt(average_4th_distance)
+	average_squared_distance = distance_sum / len(values)
+	return sqrt(average_squared_distance)
 	
 func move_creates_split_check(pos, current_district_map):
 	var start_district
@@ -322,19 +313,6 @@ func move_creates_split_check(pos, current_district_map):
 	var should_match_beginning = false
 	
 	var districts_that_should_not_appear_again = []
-	
-	var neighbors = []
-	for direction in MOORES_NEIGHBORS:
-		var check_pos = pos + direction
-		#Check if cell is in the bounds of the map
-		if (check_pos.x < 0 or check_pos.x >= CANVAS_WIDTH or check_pos.y < 0 or check_pos.y >= CANVAS_HEIGHT):
-			neighbors.append(-1)
-			
-		else:
-			var checked_cell_district = current_district_map[check_pos.x][check_pos.y]
-			neighbors.append(checked_cell_district)
-	
-	#print(str(pos) + " : " + str(neighbors))
 			
 	for direction in MOORES_NEIGHBORS:
 		var check_pos = pos + direction
