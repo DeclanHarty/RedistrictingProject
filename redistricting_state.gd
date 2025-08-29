@@ -1,28 +1,30 @@
 class_name RedistrictingState
 
-@export var CANVAS_WIDTH : int = 0
-@export var CANVAS_HEIGHT : int = 0
+var CANVAS_WIDTH : int = 0
+var CANVAS_HEIGHT : int = 0
+var NUMBER_OF_DISTRICTS : int = 0
 # 2D Array of integers that represents the map where each integer 
 # indicates what district that tile belongs to
-@export var district_map : Array
+var district_map : Array
 # Array of integers where each index indicates the district and the integer indicates the number of tiles a part of that district.
-@export var district_sizes : Array
+var district_sizes : Array
 # Current std dev among district size
-@export var size_std_dev : float = 0
+var size_std_dev : float = 0
 # Array of vector2i's that represents the sum of the positions of each district
-@export var position_sums : Array[Vector2i]
-var distance_from_center_sums : Array[float]
-@export var distance_from_center_std_dev : float = 0
-@export var score : int = 100000000000000000
+var position_sums : Array[Vector2i]
+var distance_from_center_std_dev : float = 0
+var score : int = 100000000000000000
 
 const MOORES_NEIGHBORS = [Vector2i(0,1), Vector2i(1,1),  Vector2i(1,0), Vector2i(1,-1), Vector2i(0,-1), Vector2i(-1,-1), Vector2i(-1,0), Vector2i(-1,1)]
 
 
-func intialize(district_map, district_sizes, size_std_dev, position_sums, canvas_width, canvas_height):
+func intialize(district_map, district_sizes, size_std_dev, position_sums, distance_from_center_std_dev, number_of_districts,canvas_width, canvas_height):
 	self.district_map = district_map
 	self.district_sizes = district_sizes
 	self.size_std_dev = size_std_dev
 	self.position_sums = position_sums
+	self.distance_from_center_std_dev = distance_from_center_std_dev
+	self.NUMBER_OF_DISTRICTS = number_of_districts
 	self.CANVAS_WIDTH = canvas_width
 	self.CANVAS_HEIGHT = canvas_height
 	
@@ -34,6 +36,7 @@ func copy_from(redistricting_state : RedistrictingState):
 	self.position_sums = redistricting_state.position_sums.duplicate(false)
 	self.distance_from_center_std_dev = redistricting_state.distance_from_center_std_dev
 	self.score = redistricting_state.get_score()
+	self.NUMBER_OF_DISTRICTS = redistricting_state.NUMBER_OF_DISTRICTS
 	self.CANVAS_WIDTH = redistricting_state.CANVAS_WIDTH
 	self.CANVAS_HEIGHT = redistricting_state.CANVAS_HEIGHT
 	
@@ -192,6 +195,32 @@ func calc_stand_dev(values):
 	
 	average_squared_distance = distance_sum / len(values)
 	return sqrt(average_squared_distance)
+
+func recalculate_center_deviation():
+	var district_centers = []
+	for i in range(len(position_sums)):
+		var center : Vector2 = Vector2(position_sums[i]) / float(district_sizes[i])
+		district_centers.append(center)
+	
+	# An array where the index represents the district and the value represents the total distance from center
+	# for every tile in that district
+	var distance_from_center_sums = []
+	distance_from_center_sums.resize(NUMBER_OF_DISTRICTS)
+	distance_from_center_sums.fill(0)
+	
+	for x in CANVAS_WIDTH:
+		for y in CANVAS_HEIGHT:
+			var district = district_map[x][y]
+			var distance_from_center = Vector2(x,y).distance_to(district_centers[district])
+			distance_from_center_sums[district] += distance_from_center
+			
+	var average_distances_from_district_center = []
+	for i in range(len(distance_from_center_sums)):
+		average_distances_from_district_center.append(distance_from_center_sums[i] / float(district_sizes[i]))
+		
+	distance_from_center_std_dev = calc_stand_dev(average_distances_from_district_center)
+	
+	return
 	
 func get_score():
 	return score

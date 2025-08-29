@@ -113,7 +113,7 @@ func _ready() -> void:
 	current_size_std_dev = calc_stand_dev(district_sizes)
 	
 	#Set Working State
-	working_state.intialize(district_map, district_sizes, current_size_std_dev, district_position_sums, CANVAS_WIDTH, CANVAS_HEIGHT)
+	working_state.intialize(district_map, district_sizes, current_size_std_dev, district_position_sums, avg_distance_from_center_std_dev, CANVAS_WIDTH, CANVAS_HEIGHT)
 	# Set Best from Working State
 	best_state.copy_from(working_state)
 			
