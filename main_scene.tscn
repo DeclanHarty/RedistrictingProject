@@ -4,6 +4,8 @@
 
 [node name="Node2D" type="Node2D"]
 script = ExtResource("1_0f027")
+DISTANCE_FROM_CENTER_DEV_WEIGHT = 200
+running = true
 
 [node name="CurrentMap" type="Sprite2D" parent="."]
 position = Vector2(880.355, 300)

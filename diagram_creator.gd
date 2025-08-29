@@ -62,7 +62,6 @@ func _ready() -> void:
 	# Initialize district map and district map area
 	init_district_map(district_map, district_sizes, CANVAS_WIDTH, CANVAS_HEIGHT)
 	
-	
 	#Set Images to white initially
 	working_image = Image.create_empty(CANVAS_WIDTH, CANVAS_HEIGHT, false, Image.FORMAT_RGBA8)
 	working_image.fill(Color.WHITE)
@@ -113,7 +112,7 @@ func _ready() -> void:
 	current_size_std_dev = calc_stand_dev(district_sizes)
 	
 	#Set Working State
-	working_state.intialize(district_map, district_sizes, current_size_std_dev, district_position_sums, avg_distance_from_center_std_dev, CANVAS_WIDTH, CANVAS_HEIGHT)
+	working_state.intialize(district_map, district_sizes, current_size_std_dev, district_position_sums, avg_distance_from_center_std_dev, NUMBER_OF_DISTRICTS,CANVAS_WIDTH, CANVAS_HEIGHT)
 	# Set Best from Working State
 	best_state.copy_from(working_state)
 			
@@ -161,7 +160,6 @@ func _process(delta: float) -> void:
 		else:
 			working_image.set_pixel(pos_and_new_district[0].x, pos_and_new_district[0].y, Color(COLORS[pos_and_new_district[1]]))
 
-		print(str(working_state.get_size_std_dev()) + " : " + str(initial_bad_move_chance))
 		working_texture = ImageTexture.create_from_image(working_image)
 		CURRENT_SPRITE.texture = working_texture
 		
@@ -227,42 +225,7 @@ func get_neighboring_districts(pos : Vector2i, district_map):
 			neighboring_districts.append(neighbor_district)
 			
 	return neighboring_districts
-	
-#func determine_new_edges(pos, original_district, new_district, district_map, edges):
-	#""" Determines if given tile and its neighbors are now edge tiles and updates the
-	#edges array to match"""
-	##for direction in directions:
-		##var check_pos = pos + direction
-		##if (check_pos.x < 0 or check_pos.x >= CANVAS_WIDTH or check_pos.y < 0 or check_pos.y >= CANVAS_HEIGHT):
-			##continue
-		##var check_district = district_map[check_pos.x][check_pos.y]
-		##if check_district == original_district && check_pos not in edges:
-			##edges.append(check_pos)
-		##if check_district == new_district:
-			##var is_now_edge = check_if_edge_pixel(check_pos)
-			##if(is_now_edge and check_pos not in edges):
-				##edges.append(check_pos)
-			##elif(!is_now_edge and check_pos in edges):
-				##edges.erase(check_pos)
-				#
-	#for direction in directions:
-		#var check_pos = pos + direction
-		##Check if cell is in the bounds of the map
-		#if (check_pos.x < 0 or check_pos.x >= CANVAS_WIDTH or check_pos.y < 0 or check_pos.y >= CANVAS_HEIGHT):
-			#continue
-		#
-		##Add or remove tile from edge list
-		#var is_now_edge = check_if_edge_pixel(check_pos)
-		#if(is_now_edge and check_pos not in edges):
-			#edges.append(check_pos)
-		#elif(!is_now_edge and check_pos in edges):
-			#edges.erase(check_pos)
-			#
-	##Check if the flipped pixel is still an edge
-	#var pixel_is_still_edge = check_if_edge_pixel(pos)
-	#if !pixel_is_still_edge:
-		#edges.erase(pos)
-					
+
 func flip_edge():
 	# Get a random edge tile to potentially flip
 	var edge_index = randi_range(0, len(edges) - 1)
@@ -283,8 +246,9 @@ func flip_edge():
 
 	var bad_move_value = randf()
 	#Test Move
-	var move_is_good = working_state.test_move(pos, new_district, SIZE_STD_DEV_WEIGHT, DISTANCE_FROM_CENTER_DEV_WEIGHT)
-
+	var move = working_state.test_move(pos, new_district, SIZE_STD_DEV_WEIGHT, DISTANCE_FROM_CENTER_DEV_WEIGHT)
+	var move_is_good = move[0]
+	var move_state = move[1]
 	
 	# If move decreases area std deviation or passes the bad move check
 	if(move_is_good or bad_move_value < initial_bad_move_chance):
@@ -294,7 +258,7 @@ func flip_edge():
 			number_of_bad_iterations += 1
 		
 		# Call algorithm state to perform move
-		working_state.make_move(pos, new_district, SIZE_STD_DEV_WEIGHT, DISTANCE_FROM_CENTER_DEV_WEIGHT)
+		working_state = move_state
 		
 
 		#Update edges to match new map
@@ -303,8 +267,7 @@ func flip_edge():
 		return [pos, new_district]
 	else:
 		return [Vector2i.ZERO, -1]
-
-	
+		
 func calc_stand_dev(values):
 	var average_value
 	var average_squared_distance
@@ -321,70 +284,3 @@ func calc_stand_dev(values):
 	
 	average_squared_distance = distance_sum / len(values)
 	return sqrt(average_squared_distance)
-	
-func move_creates_split_check(pos, current_district_map):
-	var start_district
-	var current_district
-	
-	# Flags
-	var loop_flag = false
-	var should_match_beginning = false
-	
-	var districts_that_should_not_appear_again = []
-			
-	for direction in MOORES_NEIGHBORS:
-		var check_pos = pos + direction
-		
-		#Check if cell is in the bounds of the map
-		if (check_pos.x < 0 or check_pos.x >= CANVAS_WIDTH or check_pos.y < 0 or check_pos.y >= CANVAS_HEIGHT):
-			# If start_district has not been set yet initialize it to -1
-			if(should_match_beginning):
-				#print("District Came Up Again")
-				return true
-			if(start_district == null):
-				start_district = -1
-				current_district = -1
-			# If current_district is different from the checked cell's district
-			elif(current_district != -1):
-				districts_that_should_not_appear_again.append(current_district)
-				current_district = -1
-			#print(-1)
-		else:
-			var checked_cell_district = current_district_map[check_pos.x][check_pos.y]
-			if(start_district == null):
-				# Set start and current district to the district of the checked cell
-				start_district = checked_cell_district
-				current_district = checked_cell_district
-			
-			# If a district that should not have appeared again comes up return true
-			elif(checked_cell_district in districts_that_should_not_appear_again):
-				#print("District Came Up Again")
-				return true
-			# If encountering a new district
-			elif(current_district != checked_cell_district):
-				if(should_match_beginning):
-					#print("Did Not Properly Loop")
-					return true
-				
-				if(current_district != start_district):
-					districts_that_should_not_appear_again.append(current_district)
-					if(loop_flag and checked_cell_district == start_district):
-						should_match_beginning = true
-						#print("Should match")
-				else:
-					
-					loop_flag = true
-					#print("set loop flag")
-					
-				current_district = checked_cell_district
-		#print(current_district)
-	#print("Went through")
-	return false
-					
-				
-			
-	
-	
-	
-	
-	

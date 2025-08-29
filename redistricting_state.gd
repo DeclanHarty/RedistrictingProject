@@ -45,14 +45,12 @@ func test_move(tile_pos : Vector2i, new_district : int, size_std_dev_weight, dis
 	var original_district = get_district_from_vector2(tile_pos)
 	var new_distance_from_center_std_dev = 0
 	
-	district_sizes_copy[original_district] -= 1
-	district_sizes_copy[new_district] += 1
+	var testing_state = RedistrictingState.new()
+	testing_state.copy_from(self)
+	testing_state.make_move(tile_pos, new_district, size_std_dev_weight, distance_from_center_std_dev_weight)
+	var new_score = testing_state.get_score()
 	
-	var new_size_std_dev = calc_stand_dev(district_sizes_copy)
-	
-	var new_score = new_size_std_dev * size_std_dev_weight + new_distance_from_center_std_dev * distance_from_center_std_dev_weight
-	
-	return new_score < score
+	return [new_score < score, testing_state]
 		
 	
 func make_move(tile_pos : Vector2i, new_district : int, size_std_dev_weight, distance_from_center_std_dev_weight):
@@ -63,7 +61,7 @@ func make_move(tile_pos : Vector2i, new_district : int, size_std_dev_weight, dis
 	district_sizes[new_district] += 1
 	
 	size_std_dev = calc_stand_dev(district_sizes)
-	print(size_std_dev)
+	distance_from_center_std_dev = recalculate_center_deviation()
 	
 	score = calculate_score(size_std_dev_weight, distance_from_center_std_dev_weight)
 	
@@ -218,9 +216,7 @@ func recalculate_center_deviation():
 	for i in range(len(distance_from_center_sums)):
 		average_distances_from_district_center.append(distance_from_center_sums[i] / float(district_sizes[i]))
 		
-	distance_from_center_std_dev = calc_stand_dev(average_distances_from_district_center)
-	
-	return
+	return calc_stand_dev(average_distances_from_district_center)
 	
 func get_score():
 	return score
