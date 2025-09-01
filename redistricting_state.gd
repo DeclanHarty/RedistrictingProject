@@ -223,3 +223,14 @@ func get_score():
 	
 func get_size_std_dev():
 	return size_std_dev
+	
+func get_leaderboard_data():
+	var leaderboard_data = []
+	for i in range(NUMBER_OF_DISTRICTS):
+		var district_data = []
+		
+		district_data.append(i)
+		district_data.append(district_sizes[i])
+		leaderboard_data.append(district_data)
+		
+	return leaderboard_data

@@ -1,16 +1,47 @@
-[gd_scene load_steps=2 format=3 uid="uid://bh4kj6gyx4jto"]
+[gd_scene load_steps=6 format=3 uid="uid://bh4kj6gyx4jto"]
 
 [ext_resource type="Script" uid="uid://bp85gl7yqabac" path="res://diagram_creator.gd" id="1_0f027"]
+[ext_resource type="Script" uid="uid://dm60nvo2jpqna" path="res://leaderboard.gd" id="2_gyfs4"]
+[ext_resource type="PackedScene" uid="uid://0doh5tbfxndm" path="res://UI Elements/LeaderBoardRecord.tscn" id="3_d5x1h"]
+
+[sub_resource type="PlaceholderTexture2D" id="PlaceholderTexture2D_0f027"]
+
+[sub_resource type="PlaceholderTexture2D" id="PlaceholderTexture2D_2c62f"]
 
 [node name="Node2D" type="Node2D"]
 script = ExtResource("1_0f027")
+CANVAS_WIDTH = 32
 DISTANCE_FROM_CENTER_DEV_WEIGHT = 200
 running = true
 
 [node name="CurrentMap" type="Sprite2D" parent="."]
-position = Vector2(880.355, 300)
-scale = Vector2(16, 16)
+position = Vector2(600, 300)
+scale = Vector2(256, 256)
+texture = SubResource("PlaceholderTexture2D_0f027")
 
 [node name="BestMap" type="Sprite2D" parent="."]
 position = Vector2(280, 300)
-scale = Vector2(16, 16)
+scale = Vector2(256, 256)
+texture = SubResource("PlaceholderTexture2D_2c62f")
+
+[node name="Leaderboard" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 964.0
+offset_top = 75.0
+offset_right = 1004.0
+offset_bottom = 115.0
+script = ExtResource("2_gyfs4")
+start_leaderboard_records_position = Vector2(-57.5, 40)
+distance_between_records = 20.0
+number_of_records = 5
+record_prefab = ExtResource("3_d5x1h")
+
+[node name="LeaderBoardTitle" type="RichTextLabel" parent="Leaderboard"]
+layout_mode = 0
+offset_left = -57.0
+offset_right = 58.0
+offset_bottom = 40.0
+pivot_offset = Vector2(57, 0)
+text = "Leader Board"
+horizontal_alignment = 1

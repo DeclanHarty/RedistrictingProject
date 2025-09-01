@@ -1,8 +1,9 @@
 extends Node2D
 
 const COLORS = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080']
-const CANVAS_WIDTH = 32
-const CANVAS_HEIGHT = 32
+
+@export var CANVAS_WIDTH = 64
+var CANVAS_HEIGHT = CANVAS_WIDTH
 const MOORES_NEIGHBORS = [Vector2i(0,1), Vector2i(1,1),  Vector2i(1,0), Vector2i(1,-1), Vector2i(0,-1), Vector2i(-1,-1), Vector2i(-1,0), Vector2i(-1,1)]
 const CARDINAL_DIRECTIONS = [Vector2i(0,1), Vector2i(0,-1), Vector2i(1,0), Vector2i(-1,0)]
 @export var NUMBER_OF_DISTRICTS = 12
@@ -36,6 +37,7 @@ var number_of_bad_iterations = 0
 
 var BEST_RESULT_SPRITE
 var CURRENT_SPRITE
+var LEADERBOARD
 
 func _ready() -> void:
 	# Initialize the Working and Current Best Images and Textures
@@ -44,9 +46,19 @@ func _ready() -> void:
 	best_image = Image.new()
 	best_texture = ImageTexture.new()
 	
+	CANVAS_HEIGHT = CANVAS_WIDTH
+	
+	
 	# Get sprite references
 	BEST_RESULT_SPRITE = $BestMap
 	CURRENT_SPRITE = $CurrentMap
+	
+	#Get Leaderboard
+	LEADERBOARD = $Leaderboard
+	
+
+	CURRENT_SPRITE.scale /= CANVAS_WIDTH
+	BEST_RESULT_SPRITE.scale /= CANVAS_WIDTH
 	# 2D Array of integers that represents the map where each integer 
 	# indicates what district that tile belongs to
 	var district_map  = []
@@ -128,6 +140,14 @@ func _ready() -> void:
 	BEST_RESULT_SPRITE.texture = best_texture
 	BEST_RESULT_SPRITE.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	
+	#Get Info for Leaderboard
+	var leaderboard_data = working_state.get_leaderboard_data()
+	
+	for i in range(NUMBER_OF_DISTRICTS):
+		leaderboard_data[i].append(COLORS[i])
+		
+	LEADERBOARD.start_leaderboard(leaderboard_data)
+	
 func _process(delta: float) -> void:
 	if (!running):
 		return
@@ -141,6 +161,10 @@ func _process(delta: float) -> void:
 		if(working_state.get_score() < best_state.get_score()):
 			print("Best Score : " + str(best_state.get_score()))
 			print("Working Score : " + str(working_state.get_score()))
+			var leaderboard_data = working_state.get_leaderboard_data()
+			for i in range(NUMBER_OF_DISTRICTS):
+				leaderboard_data[i].append(COLORS[i])
+			LEADERBOARD.update_leaderboard(leaderboard_data)
 			best_state.copy_from(working_state)
 			
 			
@@ -284,3 +308,4 @@ func calc_stand_dev(values):
 	
 	average_squared_distance = distance_sum / len(values)
 	return sqrt(average_squared_distance)
+	

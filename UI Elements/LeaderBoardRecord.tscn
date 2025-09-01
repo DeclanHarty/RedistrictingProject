@@ -1,0 +1,37 @@
+[gd_scene load_steps=3 format=3 uid="uid://0doh5tbfxndm"]
+
+[ext_resource type="Script" uid="uid://cnbxd2ik4eqbm" path="res://UI Elements/leader_board_record.gd" id="1_xmmfl"]
+
+[sub_resource type="ImageTexture" id="ImageTexture_svqer"]
+
+[node name="LeaderBoardRecord" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_xmmfl")
+
+[node name="DistrictNumber" type="RichTextLabel" parent="."]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 23.0
+text = "Num
+"
+
+[node name="DistrictColor" type="TextureRect" parent="."]
+layout_mode = 0
+offset_left = 47.0
+offset_top = 4.0
+offset_right = 68.0
+offset_bottom = 24.0
+texture = SubResource("ImageTexture_svqer")
+
+[node name="DistrictSize" type="RichTextLabel" parent="."]
+layout_mode = 0
+offset_left = 77.0
+offset_top = 1.0
+offset_right = 117.0
+offset_bottom = 41.0
+text = "Num"
